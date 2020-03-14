@@ -54,23 +54,19 @@ impl system::Trait for Runtime {
 }
 pub type System = system::Module<Runtime>;
 
-type CurrencyId = CurrencyIdentifier;
 pub type Balance = u64;
 impl Trait for Runtime {
 	type Event = TestEvent;
 	type Balance = Balance;
 	type Amount = i64;
-	//type CurrencyId = CurrencyId;
 }
 
 pub type Tokens = Module<Runtime>;
 
-//pub const TEST_TOKEN_ID: CurrencyId = H256::default();
 pub const ALICE: AccountId = 1;
 pub const BOB: AccountId = 2;
 
 pub struct ExtBuilder {
-	//currency_id: CurrencyId,
 	endowed_accounts: Vec<AccountId>,
 	initial_balance: Balance,
 }
@@ -78,7 +74,6 @@ pub struct ExtBuilder {
 impl Default for ExtBuilder {
 	fn default() -> Self {
 		Self {
-			//currency_id: TEST_TOKEN_ID,
 			endowed_accounts: vec![0],
 			initial_balance: 0,
 		}
