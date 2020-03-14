@@ -13,7 +13,9 @@ use sr_primitives::traits::{
 // #3295 https://github.com/paritytech/substrate/issues/3295
 use system::{self as system, ensure_signed};
 
-mod traits;
+use encointer_currencies::CurrencyIdentifier;
+
+pub mod traits;
 use traits::{
 	arithmetic::{self, Signed},
 	MultiCurrency, MultiCurrencyExtended,
@@ -34,7 +36,6 @@ pub trait Trait: system::Trait {
 		+ Default
 		+ Copy
 		+ MaybeSerializeDeserialize;
-	type CurrencyId: Parameter + Member + Copy + MaybeSerializeDeserialize;
 }
 
 decl_storage! {
@@ -43,13 +44,13 @@ decl_storage! {
 		pub TotalIssuance get(fn total_issuance) build(|config: &GenesisConfig<T>| {
 			let issuance = config.initial_balance * (config.endowed_accounts.len() as u32).into();
 			config.tokens.iter().map(|id| (id.clone(), issuance)).collect::<Vec<_>>()
-		}): map T::CurrencyId => T::Balance;
+		}): map CurrencyIdentifier => T::Balance;
 
 		/// The balance of a token type under an account.
-		pub Balance get(fn balance): double_map T::CurrencyId, blake2_256(T::AccountId) => T::Balance;
+		pub Balance get(fn balance): double_map CurrencyIdentifier, blake2_256(T::AccountId) => T::Balance;
 	}
 	add_extra_genesis {
-		config(tokens): Vec<T::CurrencyId>;
+		config(tokens): Vec<CurrencyIdentifier>;
 		config(initial_balance): T::Balance;
 		config(endowed_accounts): Vec<T::AccountId>;
 
@@ -66,11 +67,10 @@ decl_storage! {
 decl_event!(
 	pub enum Event<T> where
 		<T as system::Trait>::AccountId,
-		<T as Trait>::CurrencyId,
 		<T as Trait>::Balance
 	{
 		/// Token transfer success (currency_id, from, to, amount)
-		Transferred(CurrencyId, AccountId, AccountId, Balance),
+		Transferred(CurrencyIdentifier, AccountId, AccountId, Balance),
 	}
 );
 
@@ -82,7 +82,7 @@ decl_module! {
 		pub fn transfer(
 			origin,
 			dest: <T::Lookup as StaticLookup>::Source,
-			currency_id: T::CurrencyId,
+			currency_id: CurrencyIdentifier,
 			#[compact] amount: T::Balance,
 		) {
 			let from = ensure_signed(origin)?;
@@ -107,20 +107,20 @@ impl<T: Trait> Module<T> {}
 
 impl<T: Trait> MultiCurrency<T::AccountId> for Module<T> {
 	type Balance = T::Balance;
-	type CurrencyId = T::CurrencyId;
+	type CurrencyId = CurrencyIdentifier;
 	type Error = Error;
 
-	fn total_issuance(currency_id: Self::CurrencyId) -> Self::Balance {
+	fn total_issuance(currency_id: CurrencyIdentifier) -> Self::Balance {
 		<TotalIssuance<T>>::get(currency_id)
 	}
 
-	fn balance(currency_id: Self::CurrencyId, who: &T::AccountId) -> Self::Balance {
+	fn balance(currency_id: CurrencyIdentifier, who: &T::AccountId) -> Self::Balance {
 		// TODO: apply demurrage
 		<Balance<T>>::get(currency_id, who)
 	}
 
 	fn transfer(
-		currency_id: Self::CurrencyId,
+		currency_id: CurrencyIdentifier,
 		from: &T::AccountId,
 		to: &T::AccountId,
 		amount: Self::Balance,
@@ -137,7 +137,7 @@ impl<T: Trait> MultiCurrency<T::AccountId> for Module<T> {
 	}
 
 	fn deposit(
-		currency_id: Self::CurrencyId,
+		currency_id: CurrencyIdentifier,
 		who: &T::AccountId,
 		amount: Self::Balance,
 	) -> result::Result<(), Self::Error> {
@@ -153,7 +153,7 @@ impl<T: Trait> MultiCurrency<T::AccountId> for Module<T> {
 	}
 
 	fn withdraw(
-		currency_id: Self::CurrencyId,
+		currency_id: CurrencyIdentifier,
 		who: &T::AccountId,
 		amount: Self::Balance,
 	) -> result::Result<(), Self::Error> {
@@ -168,7 +168,7 @@ impl<T: Trait> MultiCurrency<T::AccountId> for Module<T> {
 		Ok(())
 	}
 
-	fn slash(currency_id: Self::CurrencyId, who: &T::AccountId, amount: Self::Balance) -> Self::Balance {
+	fn slash(currency_id: CurrencyIdentifier, who: &T::AccountId, amount: Self::Balance) -> Self::Balance {
 		let slashed_amount = Self::balance(currency_id, who).min(amount);
 		<TotalIssuance<T>>::mutate(currency_id, |v| *v -= slashed_amount);
 		<Balance<T>>::mutate(currency_id, who, |v| *v -= slashed_amount);
@@ -180,7 +180,7 @@ impl<T: Trait> MultiCurrencyExtended<T::AccountId> for Module<T> {
 	type Amount = T::Amount;
 
 	fn update_balance(
-		currency_id: Self::CurrencyId,
+		currency_id: CurrencyIdentifier,
 		who: &T::AccountId,
 		by_amount: Self::Amount,
 	) -> Result<(), Self::Error> {

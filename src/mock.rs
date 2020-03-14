@@ -60,7 +60,7 @@ impl Trait for Runtime {
 	type Event = TestEvent;
 	type Balance = Balance;
 	type Amount = i64;
-	type CurrencyId = CurrencyId;
+	//type CurrencyId = CurrencyId;
 }
 
 pub type Tokens = Module<Runtime>;
