@@ -39,7 +39,7 @@ pub trait Trait: system::Trait {
 }
 
 decl_storage! {
-	trait Store for Module<T: Trait> as Tokens {
+	trait Store for Module<T: Trait> as EncointerBalances {
 		/// The total issuance of a token type.
 		pub TotalIssuance get(fn total_issuance) build(|config: &GenesisConfig<T>| {
 			let issuance = config.initial_balance * (config.endowed_accounts.len() as u32).into();
