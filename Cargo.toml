@@ -16,6 +16,11 @@ default-features = false
 git = "https://github.com/encointer/pallet-encointer-currencies"
 package = "pallet-encointer-currencies"
 
+[dependencies.fixed]
+default-features = false
+git = "https://github.com/encointer/substrate-fixed"
+package = "substrate-fixed"
+
 [dependencies.rstd]
 default-features = false
 git = "https://github.com/paritytech/substrate"

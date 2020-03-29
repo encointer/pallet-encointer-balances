@@ -1,4 +1,4 @@
-//  Copyright (c) 2019 laminar.one
+//  Copyright (c) 2019 Alain Brenzikofer
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -68,56 +68,30 @@ impl system::Trait for Runtime {
 }
 pub type System = system::Module<Runtime>;
 
-pub type Balance = u64;
 impl Trait for Runtime {
 	type Event = TestEvent;
-	type Balance = Balance;
-	type Amount = i64;
 }
 
-pub type Tokens = Module<Runtime>;
+pub type EncointerBalances = Module<Runtime>;
 
 pub const ALICE: AccountId = 1;
 pub const BOB: AccountId = 2;
 
 pub struct ExtBuilder {
-	endowed_accounts: Vec<AccountId>,
-	initial_balance: Balance,
 }
 
 impl Default for ExtBuilder {
 	fn default() -> Self {
-		Self {
-			endowed_accounts: vec![0],
-			initial_balance: 0,
-		}
+		Self {}
 	}
 }
 
 impl ExtBuilder {
-	pub fn balances(mut self, account_ids: Vec<AccountId>, initial_balance: Balance) -> Self {
-		self.endowed_accounts = account_ids;
-		self.initial_balance = initial_balance;
-		self
-	}
-
-	pub fn one_hundred_for_alice_n_bob(self) -> Self {
-		self.balances(vec![ALICE, BOB], 100)
-	}
 
 	pub fn build(self) -> runtime_io::TestExternalities {
 		let mut t = system::GenesisConfig::default()
 			.build_storage::<Runtime>()
 			.unwrap();
-
-		GenesisConfig::<Runtime> {
-			tokens: vec![CurrencyIdentifier::default()],
-			initial_balance: self.initial_balance,
-			endowed_accounts: self.endowed_accounts,
-		}
-		.assimilate_storage(&mut t)
-		.unwrap();
-
 		t.into()
 	}
 }
