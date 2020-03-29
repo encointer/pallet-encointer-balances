@@ -57,6 +57,9 @@ git = "https://github.com/paritytech/substrate"
 package = "substrate-keyring"
 rev = "3bf9540e72df5ecb3955845764dfee7dcdbb26b5"
 
+[dev-dependencies]
+approx = "0.3.0"
+
 [dev-dependencies.runtime-io]
 git = "https://github.com/paritytech/substrate"
 package = "sr-io"
@@ -90,4 +93,5 @@ std = [
 	"sr-primitives/std",
 	"system/std",
 	"encointer-currencies/std",
+	"fixed/std",
 ]

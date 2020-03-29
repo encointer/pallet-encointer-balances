@@ -19,26 +19,51 @@ use rstd::{
 	convert::{TryFrom, TryInto},
 	result,
 };
+use codec::{Encode, Decode};
 use sr_primitives::traits::{
 	CheckedAdd, CheckedSub, MaybeSerializeDeserialize, Member, SimpleArithmetic, StaticLookup,
 };
 use system::{self as system, ensure_signed};
-use fixed::{types::I64F64, traits::{FixedSigned}};
+use fixed::{types::I64F64, 
+	traits::{FixedSigned},
+	transcendental::exp};
 use encointer_currencies::CurrencyIdentifier;
 
 mod mock;
 mod tests;
+#[cfg(test)]
+#[macro_use]
+extern crate approx;
 
 // We're working with fixpoint here.
-type BalanceType = I64F64;
+pub type BalanceType = I64F64;
+
+/// Demurrage rate per block. 
+/// Assuming 50% demurrage per year and a block time of 5s
+/// ```matlab
+/// dec2hex(-round(log(0.5)/(3600/5*24*356) * 2^64),32)
+/// ```
+/// This needs to be negated in the formula!
+// FIXME: how to define negative hex literal?
+pub const DemurrageRate: BalanceType = BalanceType::from_bits(0x0000000000000000000001E3F0A8A973_i128);
+
+#[derive(Encode, Decode, Default, Debug, Clone, Copy)]
+pub struct BalanceEntry<BlockNumber> {
+	/// The balance of the account after last manual adjustment
+	pub principal: BalanceType,
+	/// The time (block height) at which the balance was last adjusted
+	pub last_update: BlockNumber,
+}
+
 pub trait Trait: system::Trait {
 	type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
 
 decl_storage! {
 	trait Store for Module<T: Trait> as EncointerBalances {
-		pub TotalIssuance: map CurrencyIdentifier => BalanceType;
-		pub Balance: double_map CurrencyIdentifier, blake2_256(T::AccountId) => BalanceType;
+		pub TotalIssuance: map CurrencyIdentifier => BalanceEntry<T::BlockNumber>;
+		pub Balance: double_map CurrencyIdentifier, blake2_256(T::AccountId) => BalanceEntry<T::BlockNumber>;
+		pub DemurragePerBlock get(fn demurrage_per_block): BalanceType = DemurrageRate;
 	}
 }
 
@@ -81,14 +106,32 @@ decl_error! {
 
 impl<T: Trait> Module<T> {
 
-	fn balance(currency_id: CurrencyIdentifier, who: &T::AccountId) -> BalanceType {
-		// TODO: apply demurrage
-		<Balance<T>>::get(currency_id, who)
+	/// get balance and apply demurrage. This is not a noop! It changes state.
+	fn balance(currency_id: CurrencyIdentifier, who: &T::AccountId) -> BalanceEntry<T::BlockNumber> {
+		let entry = <Balance<T>>::get(currency_id, who);
+		Self::apply_demurrage(entry)
 	}
 
-	fn total_issuance(currency_id: CurrencyIdentifier) -> BalanceType {
-		// TODO: apply demurrage
-		<TotalIssuance>::get(currency_id)
+	/// get total_issuance and apply demurrage. This is not a noop! It changes state.
+	fn total_issuance(currency_id: CurrencyIdentifier) -> BalanceEntry<T::BlockNumber> {
+		let entry =	<TotalIssuance<T>>::get(currency_id);
+		Self::apply_demurrage(entry)
+	}
+
+	/// calculate actual value with demurrage
+	fn apply_demurrage(entry: BalanceEntry<T::BlockNumber>) -> BalanceEntry<T::BlockNumber> {
+		let current_block = system::Module::<T>::block_number();
+		let elapsed_time_block_number = current_block - entry.last_update;
+		let elapsed_time_u32: u32 = elapsed_time_block_number.try_into().ok()
+			.expect("blockchain will not exceed 2^32 blocks; qed").try_into().unwrap();
+		let elapsed_time = BalanceType::from_num(elapsed_time_u32);
+		let exponent : BalanceType = -Self::demurrage_per_block() * elapsed_time;
+		let exp_result : BalanceType = exp(exponent).unwrap();
+			//.expect("demurrage should never overflow");
+		BalanceEntry {
+			principal: entry.principal.checked_mul(exp_result).expect("demurrage should never overflow"),
+			last_update : current_block,
+		}
 	}
 
 	fn transfer_(
@@ -97,14 +140,17 @@ impl<T: Trait> Module<T> {
 		to: &T::AccountId,
 		amount: BalanceType,
 	) -> result::Result<(), Error> {
-		// TODO: apply demurrage
-		ensure!(Self::balance(currency_id, from) >= amount, Error::BalanceTooLow);
-
+		let mut entry_from = Self::balance(currency_id, from);
+		ensure!(entry_from.principal >= amount, Error::BalanceTooLow);
 		if from != to {
-			<Balance<T>>::mutate(currency_id, from, |balance| *balance -= amount);
-			<Balance<T>>::mutate(currency_id, to, |balance| *balance += amount);
+			let mut entry_to = Self::balance(currency_id, to);
+			entry_from.principal -= amount;
+			entry_to.principal += amount;
+			<Balance<T>>::insert(currency_id, from, entry_from);
+			<Balance<T>>::insert(currency_id, to, entry_to);
+		} else {
+			<Balance<T>>::insert(currency_id, from, entry_from);
 		}
-
 		Ok(())
 	}
 
@@ -113,14 +159,15 @@ impl<T: Trait> Module<T> {
 		who: &T::AccountId,
 		amount: BalanceType,
 	) -> result::Result<(), Error> {
-		ensure!(
-			Self::total_issuance(currency_id).checked_add(amount).is_some(),
+		let mut entry_who = Self::balance(currency_id, who);
+		let mut entry_tot = Self::total_issuance(currency_id);
+		ensure!(entry_tot.principal.checked_add(amount).is_some(),
 			Error::TotalIssuanceOverflow,
 		);
-		// TODO: apply demurrage first
-		<TotalIssuance>::mutate(currency_id, |v| *v += amount);
-		<Balance<T>>::mutate(currency_id, who, |v| *v += amount);
-
+		entry_who.principal += amount;
+		entry_tot.principal += amount;
+		<TotalIssuance<T>>::insert(currency_id, entry_tot);
+		<Balance<T>>::insert(currency_id, who, entry_who);
 		Ok(())
 	}
 
@@ -129,13 +176,15 @@ impl<T: Trait> Module<T> {
 		who: &T::AccountId,
 		amount: BalanceType,
 	) -> result::Result<(), Error> {
-		ensure!(
-			Self::balance(currency_id, who).checked_sub(amount).is_some(),
-			Error::BalanceTooLow,
-		);
-		// TODO: apply demurrage first
-		<TotalIssuance>::mutate(currency_id, |v| *v -= amount);
-		<Balance<T>>::mutate(currency_id, who, |v| *v -= amount);
+		let mut entry_who = Self::balance(currency_id, who);
+		let mut entry_tot = Self::total_issuance(currency_id);
+		entry_who.principal = if let Some(res) = entry_who.principal.checked_sub(amount) {
+			ensure!(res >= 0, Error::BalanceTooLow);
+			res
+		} else { return Err(Error::BalanceTooLow) };
+		entry_tot.principal -= amount;
+		<TotalIssuance<T>>::insert(currency_id, entry_tot);
+		<Balance<T>>::insert(currency_id, who, entry_who);
 		Ok(())
 	}
 }
