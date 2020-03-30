@@ -1,4 +1,4 @@
-//  Copyright (c) 2019 laminar.one
+//  Copyright (c) 2019 Alain Brenzikofer
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -17,11 +17,12 @@
 #![cfg(test)]
 
 use support::{impl_outer_event, impl_outer_origin, parameter_types};
+use support::{assert_noop, assert_ok};
 use system;
-use primitives::H256;
 use sr_primitives::{testing::Header, traits::IdentityLookup, Perbill};
-use encointer_currencies::CurrencyIdentifier;
-
+use primitives::{hashing::blake2_256, sr25519, Blake2Hasher, Pair, Public, H256};
+use encointer_currencies::{CurrencyIdentifier, Location, Degree};
+//use test_client::AccountKeyring;
 use super::*;
 
 impl_outer_origin! {
@@ -31,10 +32,13 @@ impl_outer_origin! {
 mod tokens {
 	pub use crate::Event;
 }
-
+mod currencies {
+	pub use encointer_currencies::Event;
+}
 impl_outer_event! {
 	pub enum TestEvent for Runtime {
 		tokens<T>,
+		currencies<T>,
 	}
 }
 
@@ -68,56 +72,73 @@ impl system::Trait for Runtime {
 }
 pub type System = system::Module<Runtime>;
 
-pub type Balance = u64;
-impl Trait for Runtime {
-	type Event = TestEvent;
-	type Balance = Balance;
-	type Amount = i64;
+impl encointer_currencies::Trait for Runtime {
+    type Event = TestEvent;
 }
 
-pub type Tokens = Module<Runtime>;
+pub type EncointerCurrencies = encointer_currencies::Module<Runtime>;
+
+impl Trait for Runtime {
+	type Event = TestEvent;
+}
+
+pub type EncointerBalances = Module<Runtime>;
 
 pub const ALICE: AccountId = 1;
 pub const BOB: AccountId = 2;
 
 pub struct ExtBuilder {
-	endowed_accounts: Vec<AccountId>,
-	initial_balance: Balance,
 }
 
 impl Default for ExtBuilder {
 	fn default() -> Self {
-		Self {
-			endowed_accounts: vec![0],
-			initial_balance: 0,
-		}
+		Self {}
 	}
 }
 
 impl ExtBuilder {
-	pub fn balances(mut self, account_ids: Vec<AccountId>, initial_balance: Balance) -> Self {
-		self.endowed_accounts = account_ids;
-		self.initial_balance = initial_balance;
-		self
-	}
-
-	pub fn one_hundred_for_alice_n_bob(self) -> Self {
-		self.balances(vec![ALICE, BOB], 100)
-	}
 
 	pub fn build(self) -> runtime_io::TestExternalities {
 		let mut t = system::GenesisConfig::default()
 			.build_storage::<Runtime>()
 			.unwrap();
-
-		GenesisConfig::<Runtime> {
-			tokens: vec![CurrencyIdentifier::default()],
-			initial_balance: self.initial_balance,
-			endowed_accounts: self.endowed_accounts,
-		}
-		.assimilate_storage(&mut t)
-		.unwrap();
-
 		t.into()
 	}
+}
+
+/// register a simple test currency with 3 meetup locations and well known bootstrappers
+pub fn register_test_currency() -> CurrencyIdentifier {
+    // all well-known keys are boottrappers for easy testen afterwards
+    let alice = 1;
+    let bob = 2;
+    let charlie = 3;
+    let dave = 4;
+    let eve = 5;
+    let ferdie = 6;
+    
+    let a = Location::default(); // 0, 0
+    
+    let b = Location {
+        lat: Degree::from_num(1),
+        lon: Degree::from_num(1),
+    };
+    let c = Location {
+        lat: Degree::from_num(2),
+        lon: Degree::from_num(2),
+    };
+    let loc = vec![a, b, c];
+    let bs = vec![
+        alice.clone(),
+        bob.clone(),
+        charlie.clone(),
+        dave.clone(),
+        eve.clone(),
+        ferdie.clone(),
+    ];
+    assert_ok!(EncointerCurrencies::new_currency(
+        Origin::signed(alice.clone()),
+        loc.clone(),
+        bs.clone()
+    ));
+    CurrencyIdentifier::from(blake2_256(&(loc, bs).encode()))
 }
