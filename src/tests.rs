@@ -18,7 +18,7 @@
 #![cfg(test)]
 
 use super::*;
-use mock::{ExtBuilder, System, TestEvent, EncointerBalances, ALICE, BOB};
+use mock::{ExtBuilder, System, TestEvent, EncointerBalances, EncointerCurrencies, ALICE, BOB, register_test_currency};
 use support::{assert_noop, assert_ok};
 use fixed::{transcendental::exp, traits::LossyInto};
 use encointer_currencies::CurrencyIdentifier;
@@ -31,8 +31,8 @@ fn issue_should_work() {
 		.execute_with(|| {
 			let cid = CurrencyIdentifier::default();
 			assert_ok!(EncointerBalances::issue(cid, &ALICE, BalanceType::from_num(50)));
-			assert_eq!(EncointerBalances::balance(cid, &ALICE).principal, BalanceType::from_num(50));
-			assert_eq!(EncointerBalances::total_issuance(cid).principal, BalanceType::from_num(50));
+			assert_eq!(EncointerBalances::balance(cid, &ALICE), BalanceType::from_num(50));
+			assert_eq!(EncointerBalances::total_issuance(cid), BalanceType::from_num(50));
 		});
 }
 
@@ -44,8 +44,8 @@ fn burn_should_work() {
 			let cid = CurrencyIdentifier::default();
 			assert_ok!(EncointerBalances::issue(cid, &ALICE, BalanceType::from_num(50)));
 			assert_ok!(EncointerBalances::burn(cid, &ALICE, BalanceType::from_num(20)));
-			assert_eq!(EncointerBalances::balance(cid, &ALICE).principal, BalanceType::from_num(30));
-			assert_eq!(EncointerBalances::total_issuance(cid).principal, BalanceType::from_num(30));
+			assert_eq!(EncointerBalances::balance(cid, &ALICE), BalanceType::from_num(30));
+			assert_eq!(EncointerBalances::total_issuance(cid), BalanceType::from_num(30));
 			assert_noop!(
 				EncointerBalances::burn(cid, &ALICE, BalanceType::from_num(31)),
 				Error::BalanceTooLow.into(),
@@ -61,9 +61,9 @@ fn transfer_should_work() {
 			let cid = CurrencyIdentifier::default();
 			assert_ok!(EncointerBalances::issue(cid, &ALICE, BalanceType::from_num(50)));
 			assert_ok!(EncointerBalances::transfer(Some(ALICE).into(), BOB, cid, BalanceType::from_num(10)));
-			assert_eq!(EncointerBalances::balance(cid, &ALICE).principal, BalanceType::from_num(40));
-			assert_eq!(EncointerBalances::balance(cid, &BOB).principal, BalanceType::from_num(10));
-			assert_eq!(EncointerBalances::total_issuance(cid).principal, BalanceType::from_num(50));
+			assert_eq!(EncointerBalances::balance(cid, &ALICE), BalanceType::from_num(40));
+			assert_eq!(EncointerBalances::balance(cid, &BOB), BalanceType::from_num(10));
+			assert_eq!(EncointerBalances::total_issuance(cid), BalanceType::from_num(50));
 
 			let transferred_event = TestEvent::tokens(RawEvent::Transferred(cid, ALICE, BOB, BalanceType::from_num(10)));
 			assert!(System::events().iter().any(|record| record.event == transferred_event));
@@ -79,19 +79,20 @@ fn demurrage_should_work() {
 	ExtBuilder::default()
 		.build()
 		.execute_with(|| {
-			let cid = CurrencyIdentifier::default();
+			let cid = register_test_currency();
 			System::set_block_number(0);
 			assert_ok!(EncointerBalances::issue(cid, &ALICE, BalanceType::from_num(1)));
 			System::set_block_number(1);
-			assert_eq!(EncointerBalances::balance(cid, &ALICE).principal, exp::<BalanceType, BalanceType>(-DemurrageRate).unwrap());
+			assert_eq!(EncointerBalances::balance(cid, &ALICE), 
+				exp::<BalanceType, BalanceType>(-EncointerCurrencies::currency_properties(cid).demurrage_per_block).unwrap());
 			//one year later
 			System::set_block_number(86400/5*356);	
-			let result: f64 = EncointerBalances::balance(cid, &ALICE).principal.lossy_into();
+			let result: f64 = EncointerBalances::balance(cid, &ALICE).lossy_into();
 			assert_abs_diff_eq!(
 				result,
 				0.5,
 				epsilon = 1.0e-12);
-			let result: f64 = EncointerBalances::total_issuance(cid).principal.lossy_into();
+			let result: f64 = EncointerBalances::total_issuance(cid).lossy_into();
 			assert_abs_diff_eq!(
 				result,
 				0.5,
@@ -105,7 +106,7 @@ fn transfer_with_demurrage_exceeding_amount_should_fail() {
 	ExtBuilder::default()
 		.build()
 		.execute_with(|| {
-			let cid = CurrencyIdentifier::default();
+			let cid = register_test_currency();
 			System::set_block_number(0);
 			assert_ok!(EncointerBalances::issue(cid, &ALICE, BalanceType::from_num(100)));
 			//one year later

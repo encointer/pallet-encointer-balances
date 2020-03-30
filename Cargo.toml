@@ -81,6 +81,11 @@ git = "https://github.com/paritytech/substrate"
 package = "substrate-runtime-interface"
 rev = "3bf9540e72df5ecb3955845764dfee7dcdbb26b5"
 
+[dev-dependencies.test-client]
+package = "substrate-test-runtime-client"
+git = "https://github.com/paritytech/substrate"
+rev = "3bf9540e72df5ecb3955845764dfee7dcdbb26b5"
+
 [features]
 default = ["std"]
 std = [
@@ -94,4 +99,8 @@ std = [
 	"system/std",
 	"encointer-currencies/std",
 	"fixed/std",
+	"fixed/serde"
 ]
+
+[patch."https://github.com/encointer/pallet-encointer-currencies"]
+pallet-encointer-currencies = { path = "../pallet-encointer-currencies" }

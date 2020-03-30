@@ -17,11 +17,12 @@
 #![cfg(test)]
 
 use support::{impl_outer_event, impl_outer_origin, parameter_types};
+use support::{assert_noop, assert_ok};
 use system;
-use primitives::H256;
 use sr_primitives::{testing::Header, traits::IdentityLookup, Perbill};
-use encointer_currencies::CurrencyIdentifier;
-
+use primitives::{hashing::blake2_256, sr25519, Blake2Hasher, Pair, Public, H256};
+use encointer_currencies::{CurrencyIdentifier, Location, Degree};
+//use test_client::AccountKeyring;
 use super::*;
 
 impl_outer_origin! {
@@ -31,10 +32,13 @@ impl_outer_origin! {
 mod tokens {
 	pub use crate::Event;
 }
-
+mod currencies {
+	pub use encointer_currencies::Event;
+}
 impl_outer_event! {
 	pub enum TestEvent for Runtime {
 		tokens<T>,
+		currencies<T>,
 	}
 }
 
@@ -68,6 +72,12 @@ impl system::Trait for Runtime {
 }
 pub type System = system::Module<Runtime>;
 
+impl encointer_currencies::Trait for Runtime {
+    type Event = TestEvent;
+}
+
+pub type EncointerCurrencies = encointer_currencies::Module<Runtime>;
+
 impl Trait for Runtime {
 	type Event = TestEvent;
 }
@@ -94,4 +104,41 @@ impl ExtBuilder {
 			.unwrap();
 		t.into()
 	}
+}
+
+/// register a simple test currency with 3 meetup locations and well known bootstrappers
+pub fn register_test_currency() -> CurrencyIdentifier {
+    // all well-known keys are boottrappers for easy testen afterwards
+    let alice = 1;
+    let bob = 2;
+    let charlie = 3;
+    let dave = 4;
+    let eve = 5;
+    let ferdie = 6;
+    
+    let a = Location::default(); // 0, 0
+    
+    let b = Location {
+        lat: Degree::from_num(1),
+        lon: Degree::from_num(1),
+    };
+    let c = Location {
+        lat: Degree::from_num(2),
+        lon: Degree::from_num(2),
+    };
+    let loc = vec![a, b, c];
+    let bs = vec![
+        alice.clone(),
+        bob.clone(),
+        charlie.clone(),
+        dave.clone(),
+        eve.clone(),
+        ferdie.clone(),
+    ];
+    assert_ok!(EncointerCurrencies::new_currency(
+        Origin::signed(alice.clone()),
+        loc.clone(),
+        bs.clone()
+    ));
+    CurrencyIdentifier::from(blake2_256(&(loc, bs).encode()))
 }
