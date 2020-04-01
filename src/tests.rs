@@ -18,7 +18,7 @@
 #![cfg(test)]
 
 use super::*;
-use mock::{ExtBuilder, System, TestEvent, EncointerBalances, EncointerCurrencies, ALICE, BOB, register_test_currency};
+use mock::{ExtBuilder, System, TestRuntime, TestEvent, EncointerBalances, EncointerCurrencies, ALICE, BOB, register_test_currency};
 use support::{assert_noop, assert_ok};
 use fixed::{transcendental::exp, traits::LossyInto};
 use encointer_currencies::CurrencyIdentifier;
@@ -48,7 +48,7 @@ fn burn_should_work() {
 			assert_eq!(EncointerBalances::total_issuance(cid), BalanceType::from_num(30));
 			assert_noop!(
 				EncointerBalances::burn(cid, &ALICE, BalanceType::from_num(31)),
-				Error::BalanceTooLow.into(),
+				Error::<TestRuntime>::BalanceTooLow,
 			);
 		});
 }
@@ -70,7 +70,7 @@ fn transfer_should_work() {
 
 			assert_noop!(
 				EncointerBalances::transfer(Some(ALICE).into(), BOB, cid, BalanceType::from_num(60)),
-				Error::BalanceTooLow.into(),
+				Error::<TestRuntime>::BalanceTooLow,
 			);
 		});
 }
@@ -114,7 +114,7 @@ fn transfer_with_demurrage_exceeding_amount_should_fail() {
 			// balance should now be 50
 			assert_noop!(
 				EncointerBalances::transfer(Some(ALICE).into(), BOB, cid, BalanceType::from_num(60)),
-				Error::BalanceTooLow.into(),
+				Error::<TestRuntime>::BalanceTooLow,
 			);
 		});
 }

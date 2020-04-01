@@ -26,7 +26,7 @@ use encointer_currencies::{CurrencyIdentifier, Location, Degree};
 use super::*;
 
 impl_outer_origin! {
-	pub enum Origin for Runtime {}
+	pub enum Origin for TestRuntime {}
 }
 
 mod tokens {
@@ -36,15 +36,16 @@ mod currencies {
 	pub use encointer_currencies::Event;
 }
 impl_outer_event! {
-	pub enum TestEvent for Runtime {
+	pub enum TestEvent for TestRuntime {
 		tokens<T>,
 		currencies<T>,
+		system<T>,
 	}
 }
 
 // Workaround for https://github.com/rust-lang/rust/issues/26925 . Remove when sorted.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Runtime;
+pub struct TestRuntime;
 parameter_types! {
 	pub const BlockHashCount: u64 = 250;
 	pub const MaximumBlockWeight: u32 = 1024;
@@ -53,7 +54,7 @@ parameter_types! {
 }
 
 type AccountId = u64;
-impl system::Trait for Runtime {
+impl system::Trait for TestRuntime {
 	type Origin = Origin;
 	type Index = u64;
 	type BlockNumber = u64;
@@ -69,20 +70,24 @@ impl system::Trait for Runtime {
 	type MaximumBlockLength = MaximumBlockLength;
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type Version = ();
+	type ModuleToIndex = ();
+	type AccountData = ();
+	type OnNewAccount = ();
+	type OnKilledAccount = ();    	
 }
-pub type System = system::Module<Runtime>;
+pub type System = system::Module<TestRuntime>;
 
-impl encointer_currencies::Trait for Runtime {
+impl encointer_currencies::Trait for TestRuntime {
     type Event = TestEvent;
 }
 
-pub type EncointerCurrencies = encointer_currencies::Module<Runtime>;
+pub type EncointerCurrencies = encointer_currencies::Module<TestRuntime>;
 
-impl Trait for Runtime {
+impl Trait for TestRuntime {
 	type Event = TestEvent;
 }
 
-pub type EncointerBalances = Module<Runtime>;
+pub type EncointerBalances = Module<TestRuntime>;
 
 pub const ALICE: AccountId = 1;
 pub const BOB: AccountId = 2;
@@ -100,7 +105,7 @@ impl ExtBuilder {
 
 	pub fn build(self) -> runtime_io::TestExternalities {
 		let mut t = system::GenesisConfig::default()
-			.build_storage::<Runtime>()
+			.build_storage::<TestRuntime>()
 			.unwrap();
 		t.into()
 	}
