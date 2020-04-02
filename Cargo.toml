@@ -1,6 +1,6 @@
 [package]
 name = "pallet-encointer-balances"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["encointer.org <alain@encointer.org> and Parity Technologies <admin@parity.io>"]
 edition = "2018"
 
@@ -82,5 +82,5 @@ std = [
 	"fixed/serde"
 ]
 
-[patch."https://github.com/encointer/pallet-encointer-currencies"]
-pallet-encointer-currencies = { path = "../pallet-encointer-currencies" }
+#[patch."https://github.com/encointer/pallet-encointer-currencies"]
+#pallet-encointer-currencies = { path = "../pallet-encointer-currencies" }

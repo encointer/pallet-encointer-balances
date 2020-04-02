@@ -15,21 +15,18 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use support::{decl_error, decl_event, decl_module, decl_storage, 
-	ensure, Parameter,
-	dispatch::DispatchResult,};
+	ensure, dispatch::DispatchResult};
 use rstd::{
-	convert::{TryFrom, TryInto},
-	result,
+	convert::TryInto,
 };
 use codec::{Encode, Decode};
 use sp_runtime::traits::{
-	CheckedAdd, CheckedSub, MaybeSerializeDeserialize, Member, StaticLookup,
+	StaticLookup,
 };
 use system::{self as system, ensure_signed};
 use fixed::{types::I64F64, 
-	traits::{FixedSigned},
 	transcendental::exp};
-use encointer_currencies::{CurrencyIdentifier, CurrencyPropertiesType};
+use encointer_currencies::CurrencyIdentifier;
 
 #[cfg(feature = "std")]
 use serde::{Serialize, Deserialize};
@@ -67,8 +64,8 @@ pub trait Trait: system::Trait + encointer_currencies::Trait {
 
 decl_storage! {
 	trait Store for Module<T: Trait> as EncointerBalances {
-		pub TotalIssuance: map hasher(opaque_blake2_256) CurrencyIdentifier => BalanceEntry<T::BlockNumber>;
-		pub Balance: double_map hasher(opaque_blake2_256) CurrencyIdentifier, hasher(opaque_blake2_256) T::AccountId => BalanceEntry<T::BlockNumber>;
+		pub TotalIssuance: map hasher(blake2_128_concat) CurrencyIdentifier => BalanceEntry<T::BlockNumber>;
+		pub Balance: double_map hasher(blake2_128_concat) CurrencyIdentifier, hasher(blake2_128_concat) T::AccountId => BalanceEntry<T::BlockNumber>;
 		//pub DemurragePerBlock get(fn demurrage_per_block): BalanceType = DemurrageRate;
 	}
 }
@@ -156,6 +153,7 @@ impl<T: Trait> Module<T> {
 	) -> DispatchResult {
 		let mut entry_from = Self::balance_entry(currency_id, from);
 		ensure!(entry_from.principal >= amount, Error::<T>::BalanceTooLow);
+		//FIXME: delete account if it falls below existential deposit
 		if from != to {
 			let mut entry_to = Self::balance_entry(currency_id, to);
 			entry_from.principal -= amount;
@@ -197,6 +195,7 @@ impl<T: Trait> Module<T> {
 			res
 		} else { return Err(Error::<T>::BalanceTooLow.into()) };
 		entry_tot.principal -= amount;
+		//FIXME: delete account if it falls below existential deposit
 		<TotalIssuance<T>>::insert(currency_id, entry_tot);
 		<Balance<T>>::insert(currency_id, who, entry_who);
 		Ok(())

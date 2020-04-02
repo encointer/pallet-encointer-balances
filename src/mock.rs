@@ -104,7 +104,7 @@ impl Default for ExtBuilder {
 impl ExtBuilder {
 
 	pub fn build(self) -> runtime_io::TestExternalities {
-		let mut t = system::GenesisConfig::default()
+		let t = system::GenesisConfig::default()
 			.build_storage::<TestRuntime>()
 			.unwrap();
 		t.into()
