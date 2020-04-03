@@ -23,6 +23,7 @@ use codec::{Encode, Decode};
 use sp_runtime::traits::{
 	StaticLookup,
 };
+use runtime_io::misc::{print_utf8, print_hex};
 use system::{self as system, ensure_signed};
 use fixed::{types::I64F64, 
 	transcendental::exp};
@@ -180,6 +181,8 @@ impl<T: Trait> Module<T> {
 		entry_tot.principal += amount;
 		<TotalIssuance<T>>::insert(currency_id, entry_tot);
 		<Balance<T>>::insert(currency_id, who, entry_who);
+		print_utf8(b"issue for:");
+		print_hex(&who.encode());
 		Ok(())
 	}
 
