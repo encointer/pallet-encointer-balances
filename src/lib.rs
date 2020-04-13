@@ -14,20 +14,20 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use support::{decl_error, decl_event, decl_module, decl_storage, ensure, Parameter};
+use support::{decl_error, decl_event, decl_module, decl_storage, 
+	ensure, dispatch::DispatchResult};
 use rstd::{
-	convert::{TryFrom, TryInto},
-	result,
+	convert::TryInto,
 };
 use codec::{Encode, Decode};
-use sr_primitives::traits::{
-	CheckedAdd, CheckedSub, MaybeSerializeDeserialize, Member, SimpleArithmetic, StaticLookup,
+use sp_runtime::traits::{
+	StaticLookup,
 };
+use runtime_io::misc::{print_utf8, print_hex};
 use system::{self as system, ensure_signed};
 use fixed::{types::I64F64, 
-	traits::{FixedSigned},
 	transcendental::exp};
-use encointer_currencies::{CurrencyIdentifier, CurrencyPropertiesType};
+use encointer_currencies::CurrencyIdentifier;
 
 #[cfg(feature = "std")]
 use serde::{Serialize, Deserialize};
@@ -65,8 +65,8 @@ pub trait Trait: system::Trait + encointer_currencies::Trait {
 
 decl_storage! {
 	trait Store for Module<T: Trait> as EncointerBalances {
-		pub TotalIssuance: map CurrencyIdentifier => BalanceEntry<T::BlockNumber>;
-		pub Balance: double_map CurrencyIdentifier, blake2_256(T::AccountId) => BalanceEntry<T::BlockNumber>;
+		pub TotalIssuance: map hasher(blake2_128_concat) CurrencyIdentifier => BalanceEntry<T::BlockNumber>;
+		pub Balance: double_map hasher(blake2_128_concat) CurrencyIdentifier, hasher(blake2_128_concat) T::AccountId => BalanceEntry<T::BlockNumber>;
 		//pub DemurragePerBlock get(fn demurrage_per_block): BalanceType = DemurrageRate;
 	}
 }
@@ -90,19 +90,20 @@ decl_module! {
 			dest: <T::Lookup as StaticLookup>::Source,
 			currency_id: CurrencyIdentifier,
 			amount: BalanceType,
-		) {
+		) -> DispatchResult {
 			let from = ensure_signed(origin)?;
 			let to = T::Lookup::lookup(dest)?;
 			Self::transfer_(currency_id, &from, &to, amount)?;
 
 			Self::deposit_event(RawEvent::Transferred(currency_id, from, to, amount));
+			Ok(())
 		}
 	}
 }
 
 decl_error! {
 	/// Error for token module.
-	pub enum Error {
+	pub enum Error for Module<T: Trait> {
 		BalanceTooLow,
 		TotalIssuanceOverflow,
 	}
@@ -151,9 +152,10 @@ impl<T: Trait> Module<T> {
 		from: &T::AccountId,
 		to: &T::AccountId,
 		amount: BalanceType,
-	) -> result::Result<(), Error> {
+	) -> DispatchResult {
 		let mut entry_from = Self::balance_entry(currency_id, from);
-		ensure!(entry_from.principal >= amount, Error::BalanceTooLow);
+		ensure!(entry_from.principal >= amount, Error::<T>::BalanceTooLow);
+		//FIXME: delete account if it falls below existential deposit
 		if from != to {
 			let mut entry_to = Self::balance_entry(currency_id, to);
 			entry_from.principal -= amount;
@@ -170,16 +172,18 @@ impl<T: Trait> Module<T> {
 		currency_id: CurrencyIdentifier,
 		who: &T::AccountId,
 		amount: BalanceType,
-	) -> result::Result<(), Error> {
+	) -> DispatchResult {
 		let mut entry_who = Self::balance_entry(currency_id, who);
 		let mut entry_tot = Self::total_issuance_entry(currency_id);
 		ensure!(entry_tot.principal.checked_add(amount).is_some(),
-			Error::TotalIssuanceOverflow,
+			Error::<T>::TotalIssuanceOverflow,
 		);
 		entry_who.principal += amount;
 		entry_tot.principal += amount;
 		<TotalIssuance<T>>::insert(currency_id, entry_tot);
 		<Balance<T>>::insert(currency_id, who, entry_who);
+		print_utf8(b"issue for:");
+		print_hex(&who.encode());
 		Ok(())
 	}
 
@@ -187,14 +191,16 @@ impl<T: Trait> Module<T> {
 		currency_id: CurrencyIdentifier,
 		who: &T::AccountId,
 		amount: BalanceType,
-	) -> result::Result<(), Error> {
+	) -> DispatchResult {
 		let mut entry_who = Self::balance_entry(currency_id, who);
 		let mut entry_tot = Self::total_issuance_entry(currency_id);
 		entry_who.principal = if let Some(res) = entry_who.principal.checked_sub(amount) {
-			ensure!(res >= 0, Error::BalanceTooLow);
+			ensure!(res >= 0, Error::<T>::BalanceTooLow);
 			res
-		} else { return Err(Error::BalanceTooLow) };
+		} else { return Err(Error::<T>::BalanceTooLow.into()) };
 		entry_tot.principal -= amount;
+		//FIXME: delete account if it falls below existential deposit
+
 		<TotalIssuance<T>>::insert(currency_id, entry_tot);
 		<Balance<T>>::insert(currency_id, who, entry_who);
 		Ok(())

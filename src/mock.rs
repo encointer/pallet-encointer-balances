@@ -19,14 +19,14 @@
 use support::{impl_outer_event, impl_outer_origin, parameter_types};
 use support::{assert_noop, assert_ok};
 use system;
-use sr_primitives::{testing::Header, traits::IdentityLookup, Perbill};
+use sp_runtime::{testing::Header, traits::IdentityLookup, Perbill};
 use primitives::{hashing::blake2_256, sr25519, Blake2Hasher, Pair, Public, H256};
 use encointer_currencies::{CurrencyIdentifier, Location, Degree};
 //use test_client::AccountKeyring;
 use super::*;
 
 impl_outer_origin! {
-	pub enum Origin for Runtime {}
+	pub enum Origin for TestRuntime {}
 }
 
 mod tokens {
@@ -36,15 +36,16 @@ mod currencies {
 	pub use encointer_currencies::Event;
 }
 impl_outer_event! {
-	pub enum TestEvent for Runtime {
+	pub enum TestEvent for TestRuntime {
 		tokens<T>,
 		currencies<T>,
+		system<T>,
 	}
 }
 
 // Workaround for https://github.com/rust-lang/rust/issues/26925 . Remove when sorted.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Runtime;
+pub struct TestRuntime;
 parameter_types! {
 	pub const BlockHashCount: u64 = 250;
 	pub const MaximumBlockWeight: u32 = 1024;
@@ -53,13 +54,13 @@ parameter_types! {
 }
 
 type AccountId = u64;
-impl system::Trait for Runtime {
+impl system::Trait for TestRuntime {
 	type Origin = Origin;
 	type Index = u64;
 	type BlockNumber = u64;
 	type Call = ();
 	type Hash = H256;
-	type Hashing = ::sr_primitives::traits::BlakeTwo256;
+	type Hashing = ::sp_runtime::traits::BlakeTwo256;
 	type AccountId = AccountId;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Header = Header;
@@ -69,20 +70,24 @@ impl system::Trait for Runtime {
 	type MaximumBlockLength = MaximumBlockLength;
 	type AvailableBlockRatio = AvailableBlockRatio;
 	type Version = ();
+	type ModuleToIndex = ();
+	type AccountData = ();
+	type OnNewAccount = ();
+	type OnKilledAccount = ();    	
 }
-pub type System = system::Module<Runtime>;
+pub type System = system::Module<TestRuntime>;
 
-impl encointer_currencies::Trait for Runtime {
+impl encointer_currencies::Trait for TestRuntime {
     type Event = TestEvent;
 }
 
-pub type EncointerCurrencies = encointer_currencies::Module<Runtime>;
+pub type EncointerCurrencies = encointer_currencies::Module<TestRuntime>;
 
-impl Trait for Runtime {
+impl Trait for TestRuntime {
 	type Event = TestEvent;
 }
 
-pub type EncointerBalances = Module<Runtime>;
+pub type EncointerBalances = Module<TestRuntime>;
 
 pub const ALICE: AccountId = 1;
 pub const BOB: AccountId = 2;
@@ -99,8 +104,8 @@ impl Default for ExtBuilder {
 impl ExtBuilder {
 
 	pub fn build(self) -> runtime_io::TestExternalities {
-		let mut t = system::GenesisConfig::default()
-			.build_storage::<Runtime>()
+		let t = system::GenesisConfig::default()
+			.build_storage::<TestRuntime>()
 			.unwrap();
 		t.into()
 	}
