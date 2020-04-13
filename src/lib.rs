@@ -94,6 +94,7 @@ decl_module! {
 			let from = ensure_signed(origin)?;
 			let to = T::Lookup::lookup(dest)?;
 			Self::transfer_(currency_id, &from, &to, amount)?;
+
 			Self::deposit_event(RawEvent::Transferred(currency_id, from, to, amount));
 			Ok(())
 		}
@@ -199,6 +200,7 @@ impl<T: Trait> Module<T> {
 		} else { return Err(Error::<T>::BalanceTooLow.into()) };
 		entry_tot.principal -= amount;
 		//FIXME: delete account if it falls below existential deposit
+
 		<TotalIssuance<T>>::insert(currency_id, entry_tot);
 		<Balance<T>>::insert(currency_id, who, entry_who);
 		Ok(())

@@ -23,7 +23,6 @@ use support::{assert_noop, assert_ok};
 use fixed::{transcendental::exp, traits::LossyInto};
 use encointer_currencies::CurrencyIdentifier;
 
-
 #[test]
 fn issue_should_work() {
 	ExtBuilder::default()
@@ -74,6 +73,7 @@ fn transfer_should_work() {
 			);
 		});
 }
+
 #[test]
 fn demurrage_should_work() {
 	ExtBuilder::default()
