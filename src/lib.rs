@@ -85,6 +85,7 @@ decl_module! {
 		fn deposit_event() = default;
 
 		/// Transfer some balance to another account.
+		#[weight = 10_000]
 		pub fn transfer(
 			origin,
 			dest: <T::Lookup as StaticLookup>::Source,
